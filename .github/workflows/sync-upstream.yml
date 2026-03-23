@@ -1,0 +1,42 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 每天 UTC 00:00 (北京时间 08:00) 运行
+  workflow_dispatch:     # 允许手动触发
+
+jobs:
+  sync-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/gdsfactory/gdsfactory.git
+          git fetch upstream
+
+      - name: Sync main branch
+        run: |
+          git checkout main
+          git merge upstream/main --no-edit
+          git push origin main
+
+      - name: Sync other branches (optional)
+        run: |
+          # 如果需要同步其他分支，取消下面的注释
+          # for branch in v7 v8; do
+          #   git checkout $branch 2>/dev/null || continue
+          #   git merge upstream/$branch --no-edit 2>/dev/null || continue
+          #   git push origin $branch 2>/dev/null || continue
+          # done
+        continue-on-error: true
