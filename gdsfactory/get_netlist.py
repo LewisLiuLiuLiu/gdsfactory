@@ -17,7 +17,7 @@ import gdsfactory as gf
 import gdsfactory.schematic as scm
 from gdsfactory.component import Component
 from gdsfactory.name import get_instance_name_from_alias as legacy_namer  # noqa: F401
-from gdsfactory.serialization import clean_value_json
+from gdsfactory.serialization import DEFAULT_SERIALIZATION_MAX_DIGITS, clean_value_json
 
 Instance: TypeAlias = kf.DInstance | kf.VInstance | kf.Instance
 ErrorBehavior: TypeAlias = Literal["ignore", "warn", "error"]
@@ -151,11 +151,9 @@ class CountedNetlistNamer:
         if not _has_instances(cell):
             # Leaf cell: use component_namer (typically function_name)
             name = base
-        elif not _has_non_default_settings(cell):
-            # Hierarchical cell with default settings: use component name as-is
-            name = base
         else:
-            # Hierarchical cell with non-default settings: use counted naming
+            # Hierarchical cell: use counted naming to avoid collisions
+            # between different parameterizations of the same component
             name = self._get_unique_name(base)
 
         self._cell_names[cell.name] = name
@@ -339,6 +337,7 @@ def get_netlist(
     instance_namer: InstanceNamer | None = None,
     component_namer: ComponentNamer = function_namer,
     port_matcher: PortMatcher | None = None,
+    serialization_max_digits: int = DEFAULT_SERIALIZATION_MAX_DIGITS,
 ) -> dict[str, Any]:
     """Extract netlist from a cell's port connectivity.
 
@@ -354,6 +353,8 @@ def get_netlist(
             Defaults to function_namer.
         port_matcher: Callable to determine if two ports are connected.
             Defaults to SmartPortMatcher().
+        serialization_max_digits: How many float digits to preserve.
+            Defaults to DEFAULT_SERIALIZATION_MAX_DIGITS
 
     Returns:
         A dictionary containing instances, placements, ports, and nets.
@@ -370,7 +371,13 @@ def get_netlist(
         port_matcher or _default_port_matcher,
         recursive=False,
     )
-    return cast(dict[str, Any], clean_value_json(recnet[next(iter(recnet))]))
+    return cast(
+        dict[str, Any],
+        clean_value_json(
+            recnet[next(iter(recnet))],
+            serialization_max_digits=serialization_max_digits,
+        ),
+    )
 
 
 def get_netlist_recursive(
@@ -382,6 +389,7 @@ def get_netlist_recursive(
     component_namer: ComponentNamer = function_namer,
     netlist_namer: NetlistNamer | None = None,
     port_matcher: PortMatcher | None = None,
+    serialization_max_digits: int = DEFAULT_SERIALIZATION_MAX_DIGITS,
 ) -> dict[str, Any]:
     """Extract netlists recursively from a cell and all its subcells.
 
@@ -399,6 +407,8 @@ def get_netlist_recursive(
             Defaults to CountedNetlistNamer(component_namer).
         port_matcher: Callable to determine if two ports are connected.
             Defaults to SmartPortMatcher().
+        serialization_max_digits: How many float digits to preserve.
+            Defaults to DEFAULT_SERIALIZATION_MAX_DIGITS
 
     Returns:
         A dictionary mapping cell names to their netlists.
@@ -415,7 +425,10 @@ def get_netlist_recursive(
         port_matcher or _default_port_matcher,
         recursive=True,
     )
-    return cast(dict[str, dict[str, Any]], clean_value_json(recnet))
+    return cast(
+        dict[str, dict[str, Any]],
+        clean_value_json(recnet, serialization_max_digits=serialization_max_digits),
+    )
 
 
 def _insert_netlist(

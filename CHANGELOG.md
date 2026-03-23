@@ -1,7 +1,41 @@
 # [Changelog](https://keepachangelog.com/en/1.0.0/)
-## [Unreleased](https://github.com/gdsfactory/gdsfactory/compare/v9.37.0...main)
+## [Unreleased](https://github.com/gdsfactory/gdsfactory/compare/v9.39.3...main)
 
 <!-- towncrier release notes start -->
+
+## [9.39.3](https://github.com/gdsfactory/gdsfactory/releases/tag/v9.39.3) - 2026-03-21
+
+- fix bend s offset [#4457](https://github.com/gdsfactory/gdsfactory/pull/4457)
+- get_netlist param serialization_max_digits [#4454](https://github.com/gdsfactory/gdsfactory/pull/4454)
+- Enable schematic function [#4455](https://github.com/gdsfactory/gdsfactory/pull/4455)
+
+
+## [9.39.2](https://github.com/gdsfactory/gdsfactory/releases/tag/v9.39.2) - 2026-03-18
+
+- fix mzi offset [#4451](https://github.com/gdsfactory/gdsfactory/pull/4451)
+-  Configure kcl.layers on activation instead of hardcoding to generic PDK [#4449](https://github.com/gdsfactory/gdsfactory/pull/4449)
+
+## [9.39.1](https://github.com/gdsfactory/gdsfactory/releases/tag/v9.39.1) - 2026-03-15
+
+- use route single for edge couplers [#4447](https://github.com/gdsfactory/gdsfactory/pull/4447)
+- remove pdk.activate now that we do it in .env [#4446](https://github.com/gdsfactory/gdsfactory/pull/4446)
+- add samples to 3d [#4434](https://github.com/gdsfactory/gdsfactory/pull/4434)
+- Add unique names to 3D geometry objects [#4442](https://github.com/gdsfactory/gdsfactory/pull/4442)
+- deps: bump docker/metadata-action from 5 to 6 [#4433](https://github.com/gdsfactory/gdsfactory/pull/4433)
+- Add LLM agent skill for gdsfactory component design and visualization [#4439](https://github.com/gdsfactory/gdsfactory/pull/4439)
+- Show layer info in autotaper error [#4440](https://github.com/gdsfactory/gdsfactory/pull/4440)
+- Copy the vinsts on ComponentAllAngle.dup [#4435](https://github.com/gdsfactory/gdsfactory/pull/4435)
+- docs: fix double punctuation in contribution.md [#4437](https://github.com/gdsfactory/gdsfactory/pull/4437)
+
+## [9.39.0](https://github.com/gdsfactory/gdsfactory/releases/tag/v9.39.0) - 2026-03-06
+
+- Feat: add a get_layer_to_mesh_order() method to LayerStack [#4431](https://github.com/gdsfactory/gdsfactory/pull/4431)
+- fix recursive netlist naming [#4430](https://github.com/gdsfactory/gdsfactory/pull/4430)
+
+## [9.38.0](https://github.com/gdsfactory/gdsfactory/releases/tag/v9.38.0) - 2026-03-04
+
+- Add option to register CrossSection factory when adding a Port [#4423](https://github.com/gdsfactory/gdsfactory/pull/4423)
+- dont_validate radius [#4427](https://github.com/gdsfactory/gdsfactory/pull/4427)
 
 ## [9.37.0](https://github.com/gdsfactory/gdsfactory/releases/tag/v9.37.0) - 2026-03-03
 

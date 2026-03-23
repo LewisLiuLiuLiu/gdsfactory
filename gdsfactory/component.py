@@ -39,7 +39,7 @@ from trimesh.scene.scene import Scene
 from typing_extensions import override
 
 from gdsfactory.config import CONF, GDSDIR_TEMP
-from gdsfactory.serialization import clean_value_json
+from gdsfactory.serialization import DEFAULT_SERIALIZATION_MAX_DIGITS, clean_value_json
 from gdsfactory.utils import to_kdb_dpoints
 
 
@@ -292,9 +292,9 @@ class ComponentBase(ProtoKCell[float, BaseKCell], ABC):
 
         return _port
 
-    def copy(self) -> Self:
+    def copy(self) -> Component:
         """Copy the full cell."""
-        return self.dup()
+        return self.dup()  # type: ignore[return-value]
 
     def add_label(
         self,
@@ -520,6 +520,7 @@ class ComponentBase(ProtoKCell[float, BaseKCell], ABC):
         component_namer: ComponentNamer | None = None,
         netlist_namer: NetlistNamer | None = None,
         port_matcher: PortMatcher | None = None,
+        serialization_max_digits: int = DEFAULT_SERIALIZATION_MAX_DIGITS,
     ) -> dict[str, Any]:
         """Returns a place-aware netlist for circuit simulation.
 
@@ -542,6 +543,8 @@ class ComponentBase(ProtoKCell[float, BaseKCell], ABC):
                 recursive=True.
             port_matcher: Callable to determine if two ports are connected.
                 Defaults to SmartPortMatcher().
+            serialization_max_digits: How many float digits to preserve.
+                Defaults to DEFAULT_SERIALIZATION_MAX_DIGITS
         """
         from gdsfactory.get_netlist import (
             function_namer,
@@ -561,6 +564,7 @@ class ComponentBase(ProtoKCell[float, BaseKCell], ABC):
                 component_namer=component_namer,
                 netlist_namer=netlist_namer,
                 port_matcher=port_matcher,
+                serialization_max_digits=serialization_max_digits,
             )
 
         return get_netlist(
@@ -570,6 +574,7 @@ class ComponentBase(ProtoKCell[float, BaseKCell], ABC):
             instance_namer=instance_namer,
             component_namer=component_namer,
             port_matcher=port_matcher,
+            serialization_max_digits=serialization_max_digits,
         )
 
     def add_ref_off_grid(
@@ -1474,7 +1479,7 @@ class ComponentAllAngle(ComponentBase, kf.VKCell):
         VInstance(self).insert_into_flat(c, levels=0)
         c.plot(**kwargs)
 
-    def dup(self, new_name: str | None = None) -> Self:
+    def dup(self, new_name: str | None = None) -> ComponentAllAngle:
         """Copy the full cell."""
         c = self.__class__(
             kcl=self.kcl, name=new_name or self.name + "$1" if self.name else None
@@ -1487,6 +1492,7 @@ class ComponentAllAngle(ComponentBase, kf.VKCell):
         for layer, shapes in self.shapes().items():
             for shape in shapes:
                 c.shapes(layer).insert(shape)
+        c._base.vinsts = self.vinsts.dup()
 
         return c
 
