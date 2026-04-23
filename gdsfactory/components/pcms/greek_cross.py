@@ -7,7 +7,7 @@ from gdsfactory.cross_section import metal1
 from gdsfactory.typings import ComponentSpec, CrossSectionSpec, Floats, LayerSpecs
 
 
-@gf.cell_with_module_name
+@gf.cell_with_module_name(tags=["pcms"])
 def greek_cross(
     length: float = 30,
     layers: LayerSpecs = ("WG", "N"),
@@ -42,7 +42,6 @@ def greek_cross(
 
 
     References:
-
     - Walton, Anthony J.. “MICROELECTRONIC TEST STRUCTURES.” (1999).
     - W. Versnel, Analysis of the Greek cross, a Van der Pauw structure with finite
       contacts, Solid-State Electronics, Volume 22, Issue 11, 1979, Pages 911-914,
@@ -89,7 +88,7 @@ def greek_cross(
     return c
 
 
-@gf.cell_with_module_name
+@gf.cell_with_module_name(tags=["pcms"])
 def greek_cross_with_pads(
     pad: ComponentSpec = "pad",
     pad_pitch: float = 150.0,

@@ -13,7 +13,7 @@ from gdsfactory.component import Component
 from gdsfactory.typings import ComponentSpec, CrossSectionSpec
 
 
-@gf.cell_with_module_name
+@gf.cell_with_module_name(tags=["filters"])
 def free_propagation_region(
     width1: float = 2.0,
     width2: float = 20.0,
@@ -47,7 +47,6 @@ def free_propagation_region(
     y1 = width1 / 2
     y2 = width2 / 2
     xs = gf.get_cross_section(cross_section)
-    o = 0
     layer = xs.layer
     assert layer is not None
 
@@ -88,8 +87,6 @@ def free_propagation_region(
             layer=layer,
         )
 
-    ypts = [y1 + o, y2 + o, -y2 - o, -y1 - o]
-
     c.info["length"] = length
     c.info["width1"] = width1
     c.info["width2"] = width2
@@ -103,7 +100,7 @@ free_propagation_region_output = partial(
 )
 
 
-@gf.cell_with_module_name
+@gf.cell_with_module_name(tags=["filters"])
 def awg(
     arms: int = 10,
     outputs: int = 3,

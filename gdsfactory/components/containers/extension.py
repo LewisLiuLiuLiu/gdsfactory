@@ -84,7 +84,7 @@ def move_polar_rad_copy(
     return np.array([pos[0] + dx, pos[1] + dy], dtype=float)
 
 
-@gf.cell_with_module_name
+@gf.cell_with_module_name(tags=["containers"])
 def extend_ports(
     component: ComponentSpec = "mmi1x2",
     port_names: PortNames | None = None,
@@ -150,7 +150,7 @@ def extend_ports(
     if auto_taper and cross_section:
         from gdsfactory.routing.auto_taper import add_auto_tapers
 
-        ports_to_extend = add_auto_tapers(
+        _ = add_auto_tapers(
             component=c, ports=ports_to_extend, cross_section=cross_section
         )
 

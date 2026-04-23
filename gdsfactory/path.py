@@ -8,7 +8,6 @@ Adapted from PHIDL https://github.com/amccaugh/phidl/ by Adam McCaughan
 
 from __future__ import annotations
 
-import functools
 import hashlib
 import math
 import warnings
@@ -105,8 +104,18 @@ class Path(UMGeometricObject):
         | Path
         | list[tuple[float, float]]
         | None = None,
+        start_angle: float | None = None,
+        end_angle: float | None = None,
     ) -> None:
-        """Creates an empty path."""
+        """Initializes a Path.
+
+        Args:
+            path: array-like[N][2], Path, or list of Paths.
+            start_angle: optional angle in degrees at the start of the path.
+                Overrides the angle inferred from the points.
+            end_angle: optional angle in degrees at the end of the path.
+                Overrides the angle inferred from the points.
+        """
         self.points: npt.NDArray[np.floating[Any]] = np.array(
             [[0, 0]], dtype=np.float64
         )
@@ -137,6 +146,10 @@ class Path(UMGeometricObject):
                     "Path() the `path` argument must be either blank, a path Object, "
                     "an array-like[N][2] list of points, or a list of these"
                 )
+        if start_angle is not None:
+            self.start_angle = mod(start_angle, 360)
+        if end_angle is not None:
+            self.end_angle = mod(end_angle, 360)
 
     def __repr__(self) -> str:
         """Returns path points."""
@@ -446,6 +459,16 @@ class Path(UMGeometricObject):
     def __hash__(self) -> int:
         """Computes a hash of the Path."""
         return self.hash_geometry()
+
+    def __eq__(self, other: object) -> bool:
+        """Check if two Path instances are equal."""
+        if not isinstance(other, Path):
+            return False
+        return (
+            np.array_equal(self.points, other.points)
+            and self.start_angle == other.start_angle
+            and self.end_angle == other.end_angle
+        )
 
     def hash_geometry(self, precision: float = 1e-4) -> int:
         """Computes an SHA1 hash of the points in the Path and the start_angle and end_angle.
@@ -1293,8 +1316,7 @@ def extrude_transition(
     transition: Transition | TransitionAsymmetric,
     all_angle: bool = False,
 ) -> AnyComponent:
-    """
-    Extrudes a path along a transition, allowing different transition methods for the upper and lower edges.
+    """Extrudes a path along a transition, allowing different transition methods for the upper and lower edges.
 
     Args:
         p: Path to extrude.
@@ -1658,46 +1680,48 @@ def arc(
     return path
 
 
-@functools.cache
-def _fresnel_coeffs(
-    n_iter: int = 8,
-) -> tuple[npt.NDArray[np.int64], npt.NDArray[np.floating]]:
-    """Compute Fresnel coefficients (cached on first call).
+_SQRT_HALF_PI: float = float(np.sqrt(np.pi / 2))
+_SQRT_2_OVER_PI: float = float(np.sqrt(2 / np.pi))
 
-    Arrays are marked read-only to prevent accidental mutation of cached values.
+
+def _fresnel_scipy(t: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+    """Evaluate Fresnel integrals via scipy.special.fresnel.
+
+    Args:
+        t: 1-D array of normalised clothoid parameter values.
+
+    Returns:
+        Array of shape (2, len(t)): [x_coords, y_coords].
     """
-    n = np.arange(n_iter)
-    exp = np.array([4 * n + 1, 4 * n + 3])
-    den = np.empty(shape=(2, n_iter))
-    den[0] = [math.factorial(2 * i) * (4 * i + 1) for i in n]
-    den[1] = [math.factorial(2 * i + 1) * (4 * i + 3) for i in n]
-    den *= (-1.0) ** n
-    exp.flags.writeable = False
-    den.flags.writeable = False
-    return exp, den
+    from scipy.special import fresnel
+
+    sin_fresnel, cos_fresnel = fresnel(t * _SQRT_2_OVER_PI)
+    return np.array([cos_fresnel * _SQRT_HALF_PI, sin_fresnel * _SQRT_HALF_PI])
 
 
 def _fresnel(
     R0: float, s: float, num_pts: int, n_iter: int = 8
 ) -> npt.NDArray[np.floating]:
-    """Fresnel integral using a series expansion with cached coefficients."""
+    """Fresnel integral using scipy.
+
+    The n_iter parameter is accepted for compatibility but ignored.
+    """
     t = np.linspace(0, s / float(np.sqrt(2) * R0), num_pts)
-    exp, den = _fresnel_coeffs(n_iter)
-    series = (t ** exp[..., None] / den[..., None]).sum(axis=1)
-    return cast("npt.NDArray[np.floating]", np.sqrt(2) * R0 * series)
+    return cast("npt.NDArray[np.floating]", np.sqrt(2) * R0 * _fresnel_scipy(t))
 
 
 def _fresnel_angular(
     R0: float, s: float, num_pts: int, n_iter: int = 8
 ) -> npt.NDArray[np.floating]:
-    """Fresnel integral with uniform angular sampling and cached coefficients."""
+    """Fresnel integral with uniform angular sampling via scipy.
+
+    The n_iter parameter is accepted for compatibility but ignored.
+    """
     t_max = s / float(np.sqrt(2) * R0)
     theta_max = t_max**2 / 2
     thetas = np.linspace(0, theta_max, num_pts)
     t = np.sqrt(2 * thetas)
-    exp, den = _fresnel_coeffs(n_iter)
-    series = (t ** exp[..., None] / den[..., None]).sum(axis=1)
-    return cast("npt.NDArray[np.floating]", np.sqrt(2) * R0 * series)
+    return cast("npt.NDArray[np.floating]", np.sqrt(2) * R0 * _fresnel_scipy(t))
 
 
 def euler(

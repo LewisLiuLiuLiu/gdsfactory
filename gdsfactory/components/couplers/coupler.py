@@ -6,8 +6,10 @@ import gdsfactory as gf
 from gdsfactory.component import Component
 from gdsfactory.typings import ComponentSpec, CrossSectionSpec, Delta
 
+from .._schematic import coupler_schematic
 
-@gf.cell_with_module_name
+
+@gf.cell_with_module_name(tags=["couplers"])
 def coupler_symmetric(
     bend: ComponentSpec = "bend_s",
     gap: float = 0.234,
@@ -75,7 +77,7 @@ def coupler_symmetric(
     return c
 
 
-@gf.cell_with_module_name
+@gf.cell_with_module_name(schematic_function=coupler_schematic, tags=["couplers"])
 def coupler_straight(
     length: float = 10.0,
     gap: float = 0.27,
@@ -115,7 +117,7 @@ def coupler_straight(
     return c
 
 
-@gf.cell_with_module_name
+@gf.cell_with_module_name(schematic_function=coupler_schematic, tags=["couplers"])
 def coupler(
     gap: float = 0.236,
     length: float = 20.0,

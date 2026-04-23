@@ -25,7 +25,7 @@ dependencies = [
   "pyyaml",
   "qrcode",
   "rectpack<1",
-  "rich<15",
+  "rich<16",
   "scipy<2",
   "shapely<3",
   "toolz<2",
@@ -52,12 +52,13 @@ license = {file = "LICENSE"}
 name = "gdsfactory"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
-version = "9.39.3"
+version = "9.40.2"
 
 [project.optional-dependencies]
 cad = ["kweb>=1.1.9,<2.1"]
 dev = [
   "codeflash",
+  "hypothesis",
   "ipykernel",
   "jupyterlab",
   "jsondiff",
@@ -200,7 +201,13 @@ ignore = [
   "SIM117",  # multiple with statements
   "T201",  # print found (used intentionally for user feedback)
   "TRY003",  # long message in exception class
-  "TRY004"  # prefer TypeError for type checks
+  "TRY004",  # prefer TypeError for type checks
+  "D100",  # Missing docstring in public module
+  "D101",  # Missing docstring in public class
+  "D102",  # Missing docstring in public method
+  "D103",  # Missing docstring in public function
+  "D104",  # Missing docstring in public package
+  "D107"  # Missing docstring in __init__
 ]
 select = [
   "A",  # flake8-builtins
@@ -208,6 +215,7 @@ select = [
   "ARG",  # flake8-unused-arguments
   "B",  # flake8-bugbear
   "C",  # flake8-comprehensions
+  "D",  # pydocstyle
   "E",  # pycodestyle errors
   "F",  # pyflakes
   "FA",  # flake8-future-annotations
@@ -300,7 +308,7 @@ message_template = "Bump to {new_version}"
 tag_template = "v{new_version}"
 
 [tool.tbump.version]
-current = "9.39.3"
+current = "9.40.2"
 regex = '''
   (?P<major>\d+)
   \.
