@@ -1,3 +1,5 @@
+from collections.abc import Iterator
+
 import pytest
 
 import gdsfactory as gf
@@ -95,3 +97,68 @@ def test_pdk_model_dump() -> None:
     pdk = _make_pdk()
     dumped = pdk.model_dump()
     assert dumped["name"] == "test"
+
+
+@pytest.fixture
+def restore_kcl_state() -> Iterator[None]:
+    from gdsfactory.gpdk import PDK
+
+    original_dbu = gf.kcl.dbu
+    gf.kcl.clear_kcells()
+    try:
+        yield
+    finally:
+        gf.kcl.clear_kcells()
+        gf.kcl.dbu = original_dbu
+        PDK.activate(force=True)
+
+
+def test_pdk_sets_dbu(restore_kcl_state: None) -> None:
+    pdk = gf.Pdk(
+        name="dbu_test",
+        layers=LAYER,
+        cross_sections={"strip": gf.cross_section.strip},
+        dbu=0.0005,
+    )
+    pdk.activate(force=True)
+    assert gf.kcl.dbu == 0.0005
+
+
+def test_pdk_dbu_change_after_cells_raises(restore_kcl_state: None) -> None:
+    gf.components.straight()
+    assert len(gf.kcl.kcells) > 0
+
+    pdk = gf.Pdk(
+        name="dbu_blocked",
+        layers=LAYER,
+        cross_sections={"strip": gf.cross_section.strip},
+        dbu=0.0005,
+    )
+    with pytest.raises(ValueError, match=r"cell\(s\) already exist"):
+        pdk.activate(force=True)
+
+
+def test_pdk_same_dbu_with_existing_cells_allowed(restore_kcl_state: None) -> None:
+    gf.components.straight()
+    assert len(gf.kcl.kcells) > 0
+
+    existing_dbu = gf.kcl.dbu
+
+    pdk = gf.Pdk(
+        name="dbu_same",
+        layers=LAYER,
+        cross_sections={"strip": gf.cross_section.strip},
+        dbu=existing_dbu,
+    )
+    pdk.activate(force=True)
+
+
+def test_get_layer_name_exception_chaining() -> None:
+    pdk = _make_pdk()
+    with pytest.raises(ValueError) as exc_info:
+        pdk.get_layer_name((999, 999))
+
+    assert "Could not find name for layer" in str(exc_info.value)
+    # Ensure that exception chaining has occurred with the inner exception, which should be ValueError
+    assert exc_info.value.__cause__ is not None
+    assert isinstance(exc_info.value.__cause__, (ValueError, KeyError, TypeError))

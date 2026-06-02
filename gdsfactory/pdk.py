@@ -143,6 +143,8 @@ class Pdk(BaseModel):
         routing_strategies: functions enabled to route.
         bend_points_distance: default points distance for bends in um.
         connectivity: defines connectivity between layers through vias.
+        dbu: database unit in um. Applied to kf.kcl on activate().
+           Default 0.001 (1 nm/dbu).
 
     """
 
@@ -176,6 +178,7 @@ class Pdk(BaseModel):
     bend_points_distance: float = 20 * nm
     connectivity: Sequence[ConnectivitySpec] | None = None
     max_cellname_length: int = CONF.max_cellname_length
+    dbu: float = Field(default=1 * nm, gt=0)
 
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
@@ -208,20 +211,22 @@ class Pdk(BaseModel):
     def model_post_init(self, context: Any) -> None:
         super().model_post_init(context)
 
-        # update the cross sections and cells from base pdks
+        # update the cross sections, cells and containers from base pdks
         # precedence goes from first to last base PDK, and then finally to this PDK
         # (duplicates in the last base PDK will overwrite the others, and this PDK will overwrite that)
-        cross_sections = {}
-        cells = {}
+        cross_sections, cells, containers = {}, {}, {}
         for pdk in self.base_pdks:
             cross_sections.update(pdk.cross_sections)
             cells.update(pdk.cells)
+            containers.update(pdk.containers)
 
         cross_sections.update(self.cross_sections)
         cells.update(self.cells)
+        containers.update(self.containers)
 
         self.cross_sections = cross_sections
         self.cells = cells
+        self.containers = containers
 
     def xsection(
         self, func: Callable[..., CrossSection]
@@ -241,7 +246,9 @@ class Pdk(BaseModel):
                 return gf.cross_section.cross_section(width=width, radius=radius)
         """
         return cross_section_xsection(
-            func, self.cross_sections, self.cross_section_default_names
+            cast("CrossSectionFactory", func),  # type: ignore[redundant-cast]
+            self.cross_sections,
+            self.cross_section_default_names,
         )
 
     def activate(self, force: bool = False) -> None:
@@ -355,10 +362,11 @@ class Pdk(BaseModel):
                     raise ValueError(
                         f"Invalid setting {key!r} not in {component_settings}"
                     )
-            settings = dict(cell.get("settings", {}))
+            cell_dict = cast("dict[str, Any]", cell)  # type: ignore[redundant-cast]
+            settings = dict(cell_dict.get("settings", {}))
             settings.update(**kwargs)
 
-            cell_name = cell.get("function")
+            cell_name = cell_dict.get("function")
             if not isinstance(cell_name, str) or cell_name not in cells_and_containers:
                 matching_cells = [
                     c
@@ -375,7 +383,7 @@ class Pdk(BaseModel):
             )
         if settings:
             return partial(cell_func, **settings)
-        return cell_func
+        return cast("ComponentFactory | ComponentAllAngleFactory", cell_func)  # type: ignore[redundant-cast]
 
     def get_component(
         self,
@@ -436,10 +444,9 @@ class Pdk(BaseModel):
         kwargs = kwargs or {}
         kwargs.update(settings)
 
-        if isinstance(component, kf.ProtoTKCell):
-            return Component(base=component.base)
-        if isinstance(component, kf.VKCell):
-            return ComponentAllAngle(base=component.base)
+        if isinstance(component, Component | ComponentAllAngle):
+            return component
+
         if callable(component):
             _component = component(**kwargs)
             return type(_component)(base=_component.base)  # type: ignore[call-overload,no-any-return]
@@ -464,11 +471,12 @@ class Pdk(BaseModel):
                     raise ValueError(
                         f"Invalid setting {key!r} not in {component_settings}"
                     )
-            settings = dict(component.get("settings", {}))
+            component_dict = cast("dict[str, Any]", component)  # type: ignore[redundant-cast]
+            settings = dict(component_dict.get("settings", {}))
             settings.update(**kwargs)
 
-            cell_name = component.get("component", None)
-            cell_name = cell_name or component.get("function")
+            cell_name = component_dict.get("component", None)
+            cell_name = cell_name or component_dict.get("function")
             cell_name = str(cell_name).split(".")[-1]
 
             if cell_name not in cells:
@@ -503,10 +511,11 @@ class Pdk(BaseModel):
                 xs._name = self.cross_section_default_names[xs.name]
             return xs
         if isinstance(cross_section, dict):
-            xs_name = cross_section.get("cross_section", None)
+            xs_dict = cast("dict[str, Any]", cross_section)  # type: ignore[redundant-cast]
+            xs_name = xs_dict.get("cross_section", None)
             if xs_name is None:
                 raise ValueError("cross_section name is required")
-            settings = cross_section.get("settings", {})
+            settings = xs_dict.get("settings", {})
             return self.get_cross_section(xs_name, **settings)
         if isinstance(cross_section, CrossSection):
             if kwargs:
@@ -521,10 +530,17 @@ class Pdk(BaseModel):
                 cross_section_ = cross_section.base
             else:
                 cross_section_ = cross_section
+
+            layer: LayerSpec = kf.kcl.layout.layer(cross_section_.main_layer)
+            try:
+                layer = self.get_layer_name(layer)
+            except ValueError:
+                logger.debug("Could not resolve layer name for %r, using as-is", layer)
+
             section_ = Section(
                 name="_default",
                 width=kf.kcl.to_um(cross_section_.width),
-                layer=kf.kcl.layout.layer(cross_section_.main_layer),
+                layer=layer,
                 port_names=("o1", "o2"),
             )
             xs_ = CrossSection(
@@ -559,11 +575,13 @@ class Pdk(BaseModel):
         assert self.layers is not None
         try:
             return str(self.layers[layer_index])  # type: ignore[index]
-        except Exception:
+        except (KeyError, IndexError, TypeError):
             try:
                 return str(self.layers(layer_index))  # type: ignore[call-arg]
-            except Exception:
-                raise ValueError(f"Could not find name for layer {layer_index}")
+            except (KeyError, TypeError, ValueError) as inner_exc:
+                raise ValueError(
+                    f"Could not find name for layer {layer_index}"
+                ) from inner_exc
 
     def get_layer_views(self) -> LayerViews:
         if self._layer_views_cache is not None:
@@ -584,9 +602,9 @@ class Pdk(BaseModel):
     def get_constant(self, key: str) -> Any:
         try:
             return getattr(self.constants, key)
-        except AttributeError:
+        except AttributeError as e:
             constants = list(self.constants.model_dump().keys())
-            raise AttributeError(f"{key!r} not in {constants}")
+            raise AttributeError(f"{key!r} not in {constants}") from e
 
     def to_updk(self, exclude: Sequence[str] | None = None) -> str:
         """Export to uPDK YAML definition."""
@@ -799,6 +817,14 @@ def get_constant(constant_name: Any) -> Any:
 
 def _set_active_pdk(pdk: Pdk) -> None:
     global _ACTIVE_PDK
+
+    if pdk.dbu != kf.kcl.dbu and len(kf.kcl.kcells) > 0:
+        raise ValueError(
+            f"Cannot change DBU from {kf.kcl.dbu} to {pdk.dbu}: "
+            f"{len(kf.kcl.kcells)} cell(s) already exist on the KCLayout."
+            "Activate the PDK before building any cells."
+        )
+
     _ACTIVE_PDK = pdk
 
     if pdk.layers is not None:
@@ -809,6 +835,9 @@ def _set_active_pdk(pdk: Pdk) -> None:
     else:
         kf.kcl.infos = kf.LayerInfos()
         kf.kcl.layers = kf.kcl.layerenum_from_dict(layers=kf.kcl.infos)
+
+    if pdk.dbu != kf.kcl.dbu:
+        kf.kcl.layout.dbu = pdk.dbu
 
 
 def get_routing_strategies() -> RoutingStrategies:
